@@ -304,6 +304,8 @@
         const moveState = { forward: false, backward: false, left: false, right: false, jump: false };
         let velocity = new THREE.Vector3();
         let direction = new THREE.Vector3();
+        const forward = new THREE.Vector3();
+        const right = new THREE.Vector3();
         let canJump = false;
 
         document.addEventListener('keydown', (e) => {
@@ -366,12 +368,13 @@
 
         function checkCollision(pos) {
             // プレイヤーのBoundingBoxを定義
-            const minX = Math.floor(pos.x - playerRadius);
-            const maxX = Math.floor(pos.x + playerRadius);
-            const minY = Math.floor(pos.y - playerHeight);
-            const maxY = Math.floor(pos.y + 0.2); // 頭の少し上
-            const minZ = Math.floor(pos.z - playerRadius);
-            const maxZ = Math.floor(pos.z + playerRadius);
+            // ブロックの中心は整数座標、各面は中心から0.5の位置
+            const minX = Math.floor(pos.x - playerRadius + 0.5);
+            const maxX = Math.ceil(pos.x + playerRadius + 0.5) - 1;
+            const minY = Math.floor(pos.y - playerHeight + 0.5);
+            const maxY = Math.ceil(pos.y + 0.2 + 0.5) - 1; // 頭の少し上
+            const minZ = Math.floor(pos.z - playerRadius + 0.5);
+            const maxZ = Math.ceil(pos.z + playerRadius + 0.5) - 1;
 
             for (let x = minX; x <= maxX; x++) {
                 for (let y = minY; y <= maxY; y++) {
@@ -401,13 +404,18 @@
                 velocity.z -= velocity.z * 10.0 * delta;
                 velocity.y -= gravity * delta; 
 
-                direction.z = Number(moveState.forward) - Number(moveState.backward);
-                direction.x = Number(moveState.right) - Number(moveState.left);
+                camera.getWorldDirection(forward);
+                forward.y = 0;
+                forward.normalize();
+                right.crossVectors(forward, camera.up).normalize();
+                direction.set(0, 0, 0);
+                direction.addScaledVector(forward, Number(moveState.forward) - Number(moveState.backward));
+                direction.addScaledVector(right, Number(moveState.right) - Number(moveState.left));
                 direction.normalize(); // 斜め移動が速くならないように
 
                 const speed = 50.0;
-                if (moveState.forward || moveState.backward) velocity.z -= direction.z * speed * delta;
-                if (moveState.left || moveState.right) velocity.x -= direction.x * speed * delta;
+                velocity.x += direction.x * speed * delta;
+                velocity.z += direction.z * speed * delta;
                 
                 if (moveState.jump) {
                     velocity.y = 8.5; // ジャンプ力
@@ -439,7 +447,7 @@
                     if (velocity.y < 0) { // 床に着地
                         canJump = true;
                         // 床の上にスナップさせる
-                        nextPos.y = Math.floor(nextPos.y - playerHeight) + 1 + playerHeight;
+                        nextPos.y = Math.floor(nextPos.y - playerHeight + 0.5) + 0.5 + playerHeight;
                     } else if (velocity.y > 0) { // 天井にぶつかる
                         nextPos.y = oldPos.y;
                     }
